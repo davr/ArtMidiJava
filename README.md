@@ -3,6 +3,9 @@ ArtMidiJava
 
 This uses [ArtClientLib](https://raw.githubusercontent.com/rjwut/ArtClientLib/master/readme.md) to connect to an Artemis server and manipulate engineering controls based on the input from a midi mixer device. This method has proved to be much more reliable than the previous attempt where I manipulated the mouse cursor to actually click on the controls on-screen.
 
+**Download Pre-compiled JAR**
+Direct link to download here: [ArtMidiJava.jar](https://github.com/davr/ArtMidiJava/raw/master/ArtMidiJava/ArtMidiJava.jar). 
+
 **Running Instructions:**
 
 1. Start the Artemis server
