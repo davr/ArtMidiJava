@@ -42,6 +42,10 @@ import	javax.sound.midi.Receiver;
 
 public class ArtemisProxy implements Runnable {
     public static void main(String[] args) {
+    	if(args.length < 1) {
+    		System.out.println("Usage: ArtMidiJava remoteserver[:port] [localport]\n remoteserver - address (and optionally port) of the remote Artemis Server\n localport - local port to listen on for connections from artemis client\n" );
+    		System.exit(1);
+    	}
         String serverAddr = args[0];
         int port = args.length > 1 ? Integer.parseInt(args[1]) : 2010;
         new Thread(new ArtemisProxy(port, serverAddr)).start();
