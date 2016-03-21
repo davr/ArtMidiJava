@@ -249,6 +249,8 @@ public class ArtemisProxy implements Runnable {
             ArtemisNetworkInterface dest = type == ConnectionType.SERVER ? client : server;
             dest.send(pkt);
             
+            updateEnergies();
+            
             if(type != ConnectionType.SERVER) return;
             
     		// Find the PacketFactory that knows how to handle this packet type
@@ -277,8 +279,11 @@ public class ArtemisProxy implements Runnable {
 				
    			}
    			
-   			if(System.currentTimeMillis() - lastUpdateHeat >= 250)
+   			if(System.currentTimeMillis() - lastUpdateHeat >= BLINK) {
+   				System.out.println(System.currentTimeMillis() - lastUpdateHeat);
+   				lastUpdateHeat = System.currentTimeMillis(); 
    				updateHeat();
+   			}
             
         }
         
@@ -316,6 +321,7 @@ public class ArtemisProxy implements Runnable {
     		System.out.println(strTimeStamp + strMessage);
     	}
     	
+    	public double[] energies = new double[8];
 
     	/*
         # Controls:
@@ -324,8 +330,30 @@ public class ArtemisProxy implements Runnable {
         	# 0x20 - 0x27: S buttons
         	# 0x30 - 0x37: M buttons
         	# 0x40 - 0x47: R buttons
+        	
 */
+    	public void updateEnergies() {
+    		for(int i=0; i<8; i++) {
+    			if(energies[i] >= 0)
+    				setEnergy(i, energies[i], true);
+        		energies[i] = -1;
+    		}    		
+    	}
+
+    	public void setEnergy(int control, double energy, boolean force) {
+			EngSetEnergyPacket ePkt = new EngSetEnergyPacket(ShipSystem.values()[control], (float)energy);
+    		server.send(ePkt);    		    		
+    	}
+
     	public void setEnergy(int control, double energy) {
+    		if(energies[control] != -1) {
+    			energies[control] = energy;
+    			return;
+    		}
+    		
+    		if(energies[control] == -1)
+    			energies[control] = -2;    		
+    		
     		out(ShipSystem.values()[control]+" to "+energy);
 			EngSetEnergyPacket ePkt = new EngSetEnergyPacket(ShipSystem.values()[control], (float)energy);
     		server.send(ePkt);    		    		
@@ -404,7 +432,8 @@ public class ArtemisProxy implements Runnable {
     		}
     	}
     	
-    	public void setLights(int control, boolean S, boolean M, boolean R) {
+    	public void setLights(int control, boolean R, boolean M, boolean S) {
+    		//System.out.print((S?"1":"0")+(M?"1":"0")+(R?"1":"0"));
     		setLight(0x20 + control, S);
     		setLight(0x30 + control, M);
     		setLight(0x40 + control, R);
@@ -412,29 +441,34 @@ public class ArtemisProxy implements Runnable {
     	
     	double[] heats = new double[8];
     	
+    	private int BLINK = 100;
+    	
     	public void updateHeat() {
     		if(world == null) return;
             ArtemisPlayer player = world.getPlayerShip(0);            
     		if(player == null) return;
+    		//System.out.print("L: ");
             for(int i=0; i<8; i++) {
             	double heat = player.getSystemHeat(ShipSystem.values()[i]);
-            	if(heat < 0.10) {
+            	if(heat < 0.20) {
             		setLights(i, false, false, false);
-            	} else if(heat < 0.30) {
+            	} else if(heat < 0.50) {
             		setLights(i, true, false, false);
-	            } else if(heat < 0.50) {
-	        		setLights(i, true, true, false);
 	            } else if(heat < 0.70) {
+	        		setLights(i, true, true, false);
+	            } else if(heat < 0.85) {
 	        		setLights(i, true, true, true);
 	            } else {
-	            	if(System.currentTimeMillis() % 500 < 250)
+	            	if(System.currentTimeMillis() % (BLINK*2) < BLINK)
 	            		setLights(i, true, true, true);
 	            	else
 	            		setLights(i, false, false, false);
 	        	}
             }
+            //System.out.println(" ");
             	
     	}
+    	
     	
     	public String decodeMessage(ShortMessage message)
     	{
