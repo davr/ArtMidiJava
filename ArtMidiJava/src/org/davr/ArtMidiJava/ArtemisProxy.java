@@ -59,6 +59,7 @@ public class ArtemisProxy implements Runnable {
     public ThreadedArtemisNetworkInterface server;
     
     public MidiDevice midiDevice = null;
+    public MidiDevice midiDevice2 = null;
     public Receiver midi = null;
     
     public ArtemisProxy(int port, String serverAddr) {
@@ -76,19 +77,39 @@ public class ArtemisProxy implements Runnable {
     @Override
     public void run() {
         ServerSocket listener = null;
+        int inID = 1;
+        int outID = 4;
 
-        try {
-            MidiCommon.listDevicesAndExit(true, true, true);
-        	
-            String strDeviceName = "LoopBe Internal MIDI";
-    		MidiDevice.Info info;
-    		//info = MidiCommon.getMidiDeviceInfo(strDeviceName, false);
-    		info = MidiCommon.getMidiDeviceInfo(1);
-    		if (info == null) {
-    			out("no device info found for name " + strDeviceName);
-    		} else {
-    			out(info.toString());
+        try {            
+    		MidiDevice.Info[]	aInfos = MidiSystem.getMidiDeviceInfo();
+    		for (int i = 0; i < aInfos.length; i++)
+    		{
+    			try
+    			{
+    				MidiDevice	device = MidiSystem.getMidiDevice(aInfos[i]);
+    				boolean		bAllowsInput = (device.getMaxTransmitters() != 0);
+    				boolean		bAllowsOutput = (device.getMaxReceivers() != 0);
+    				if(aInfos[i].getName() == "nanoKONTROL2" && bAllowsInput)
+    					inID = i;
+    				if(aInfos[i].getName() == "nanoKONTROL2" && bAllowsOutput)
+    					outID = i;
+					out("" + i + "  "
+						+ (bAllowsInput?"IN ":"   ")
+						+ (bAllowsOutput?"OUT ":"    ")
+						+ aInfos[i].getName() + ", "
+						+ aInfos[i].getVendor() + ", "
+						+ aInfos[i].getVersion() + ", "
+						+ aInfos[i].getDescription());    				
+    			}
+    			catch (MidiUnavailableException e)
+    			{
+    				// device is obviously not available...
+    				// out(e);
+    			}
     		}
+        	
+    		MidiDevice.Info info;
+    		info = aInfos[inID];
     		try {
     			midiDevice = MidiSystem.getMidiDevice(info);
     			midiDevice.open();
@@ -107,11 +128,11 @@ public class ArtemisProxy implements Runnable {
     			out("connected output to midi");
     		} catch (Exception e) {
     			
-    			out("First output attempt failed:");
-    			out(e.toString());
+    			out("First output attempt failed (expected if in/out devices are separate): " + e.toString());
     			try {
-					MidiDevice device2 = MidiSystem.getMidiDevice(MidiCommon.getMidiDeviceInfo(4));
-					midi = device2.getReceiver();
+					midiDevice2 = MidiSystem.getMidiDevice(aInfos[outID]);
+					midiDevice2.open();
+					midi = midiDevice2.getReceiver();
 					out("connected output to midi (try 2)");
 				} catch (Exception e1) {
 	    			out("wasn't able to get output to midi device:");
@@ -119,6 +140,15 @@ public class ArtemisProxy implements Runnable {
 					e1.printStackTrace();
 				}
     		}
+
+    		try {
+    			for(int i=0;i<127;i++)
+    				midi.send(new ShortMessage(ShortMessage.CONTROL_CHANGE, i, 127), -1);
+			} catch (Exception e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+    		    		
 
             listener = new ServerSocket(this.port, 0);
             listener.setSoTimeout(0);
@@ -144,6 +174,13 @@ public class ArtemisProxy implements Runnable {
     			//System.exit(1);
     		}
             
+    		try {
+    			for(int i=0;i<127;i++)
+    				midi.send(new ShortMessage(ShortMessage.CONTROL_CHANGE, i, 0), -1);    			
+			} catch (Exception e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
             
             
         } catch (IOException ex) {
@@ -165,8 +202,10 @@ public class ArtemisProxy implements Runnable {
         private PacketFactoryRegistry factoryRegistry;
         public SystemManager world;
 
-        private ProxyListener(ArtemisNetworkInterface server, ArtemisNetworkInterface client, PacketFactoryRegistry factoryRegistry) {
-            this.server = server;
+        private ProxyListener(ArtemisNetworkInterface server, ArtemisNetworkInterface client, PacketFactoryRegistry factoryRegistry) {            
+        	for(int i=0;i<8;i++) energies[i]=-1;
+        	
+        	this.server = server;
             this.client = client;
             this.factoryRegistry = factoryRegistry;
             world = new SystemManager();
@@ -195,9 +234,8 @@ public class ArtemisProxy implements Runnable {
         	# 0x40 - 0x47: R buttons
 */
         public void setLight(int btn, boolean on) {
-        	if(midi == null) return;
         	try {
-				midi.send(new ShortMessage(176, btn, on?127:0), -1);
+				midi.send(new ShortMessage(ShortMessage.CONTROL_CHANGE, btn, on?127:0), -1);
 			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				out("Error setting lights:");
