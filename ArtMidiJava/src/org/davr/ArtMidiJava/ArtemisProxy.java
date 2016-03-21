@@ -294,18 +294,76 @@ public class ArtemisProxy implements Runnable {
     	}
     	
     	public void setCoolant(int control, int coolant) {
-    		out(ShipSystem.values()[control]+" cool "+coolant);
+    		//out(ShipSystem.values()[control]+" cool "+coolant);
 			EngSetCoolantPacket cPkt = new EngSetCoolantPacket(ShipSystem.values()[control], coolant);
 			server.send(cPkt);    		
     	}
     	
     	public int[] coolants = new int[8];
     	
+    	public int maxDouble(double[] nums) {
+    		double max = nums[0];
+    		int maxi = 0;
+    		for(int i=0; i<nums.length; i++) {
+    			if(nums[i] > max) {
+    				max = nums[i];
+    				maxi=i;
+    			}    				
+    		}
+    		return maxi;
+    	}    	
+    	public int minDouble(double[] nums) {
+    		double min = nums[0];
+    		int mini = 0;
+    		for(int i=0; i<nums.length; i++) {
+    			if(nums[i] < min) {
+    				min = nums[i];
+    				mini=i;
+    			}    				
+    		}
+    		return mini;
+    	}
+    	
+    	public int[] lastCoolant = new int[8];
+    	
     	public void updateCoolants() {
-    		int sum=0;
+    		double sum=0;
     		for(int i=0; i<8; i++)
-    			sum += coolants[i];    		
+    			sum += coolants[i];
     		
+    		if(sum < 127) 
+    			sum = 127;
+    		
+    		int sum2=0;
+    		double[] coolants2 = new double[8];
+    		double[] fractions = new double[8];
+    		for(int i=0; i<8; i++) {
+    			coolants2[i] = coolants[i]*8.0/sum;
+    			double flr = Math.floor(coolants2[i]);
+    			fractions[i] = coolants2[i]-flr;
+    			sum2 += flr;
+    		}
+    		
+    		if(sum > 127)
+    		while(sum2 < 8) {
+    			int max = maxDouble(fractions);
+    			coolants2[max]++;
+    			fractions[max]=0;
+    			sum2++;
+    		}
+    		
+    		while(sum2 > 8) {
+    			int min = minDouble(fractions);
+    			coolants2[min]++;
+    			fractions[min]=.999;
+    			sum2++;
+    		}
+    		
+    		for(int i=0; i<8; i++) {
+    			if(lastCoolant[i] != (int)coolants2[i])
+    				setCoolant(i, (int)coolants2[i]);
+    			lastCoolant[i] = (int)coolants2[i];
+    		}
     	}
     	
     	public void setLights(int control, boolean S, boolean M, boolean R) {
@@ -361,7 +419,7 @@ public class ArtemisProxy implements Runnable {
     				coolants[control - 0x10] = value;
     				updateCoolants();
     				
-    				setCoolant(control - 0x10, (value * 8)/127);
+    				//setCoolant(control - 0x10, (value * 8)/127);
     			}
     			break;
 
